@@ -1,0 +1,36 @@
+# Runs on the app instance. Ships container + system logs to Loki.
+# ${LOKI_HOST} is the monitoring instance private IP, set at deploy time.
+server:
+  http_listen_port: 9080
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://${LOKI_HOST}:3100/loki/api/v1/push
+
+scrape_configs:
+  # Application + access logs (Express writes request logs to stdout -> docker json logs)
+  - job_name: docker
+    static_configs:
+      - targets: ["localhost"]
+        labels:
+          job: docker
+          host: app
+          __path__: /var/lib/docker/containers/*/*-json.log
+    pipeline_stages:
+      - json:
+          expressions:
+            log: log
+            stream: stream
+      - output:
+          source: log
+
+  # System logs
+  - job_name: system
+    static_configs:
+      - targets: ["localhost"]
+        labels:
+          job: system
+          host: app
+          __path__: /var/log/{messages,secure,cron}

@@ -1,0 +1,25 @@
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Variable files may hold sensitive values (keep the .example)
+*.tfvars
+!*.tfvars.example
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Env files
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

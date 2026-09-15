@@ -1,0 +1,170 @@
+// Declarative Jenkins pipeline for the todo app.
+//
+// Flow:
+//   - On any branch / PR : checkout -> install -> lint -> unit+integration tests
+//                          -> dependency scan (npm audit + Trivy fs)
+//   - On main only       : build image -> Trivy image scan -> push to ECR
+//                          -> deploy staging (SSM) -> smoke test
+//                          -> manual approval -> deploy prod (SSM) -> smoke test
+//   - Any failure        : email notification
+//
+// One-time Jenkins setup required (see ci/README.md):
+//   - Jenkins runs on EC2 with an instance role granting ECR push + SSM send-command,
+//     so no AWS keys are stored in Jenkins (the aws CLI picks up the role).
+//   - Docker + AWS CLI installed on the agent.
+//   - SMTP configured (Manage Jenkins -> System) for failure emails.
+//   - Plugins: Pipeline, Docker Pipeline, Email Extension
+
+pipeline {
+  agent any
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+    timeout(time: 30, unit: 'MINUTES')
+  }
+
+  environment {
+    AWS_REGION     = 'ap-south-1'
+    ECR_REPO       = 'octabyte-devops/app'
+    IMAGE_TAG      = "${env.BRANCH_NAME ?: 'main'}-${env.BUILD_NUMBER}"
+    DB_SECRET_NAME = 'octabyte-devops/db/credentials'
+    // Only APP_INSTANCE_ID must be set in Jenkins global env:
+    //   APP_INSTANCE_ID = the app EC2 instance id (terraform output app_instance_id)
+    // The account id (and thus ECR registry) is derived from the instance role via STS.
+  }
+
+  stages {
+
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Resolve AWS context') {
+      steps {
+        script {
+          // Derive account id from the instance role; no hardcoded AWS_ACCOUNT_ID.
+          env.AWS_ACCOUNT_ID = sh(
+            script: "aws sts get-caller-identity --query Account --output text",
+            returnStdout: true
+          ).trim()
+          env.ECR_REGISTRY = "${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
+          echo "Using ECR registry: ${env.ECR_REGISTRY}"
+        }
+      }
+    }
+
+    // ---- Test (runs on every branch and PR) --------------------------------
+    stage('Install & Test') {
+      agent {
+        docker {
+          image 'node:20'
+          reuseNode true
+        }
+      }
+      steps {
+        dir('node-js-dummy-test') {
+          sh 'npm ci'
+          sh 'npm test'   // unit + integration tests (DB_MOCK=true)
+        }
+      }
+    }
+
+    // ---- Dependency vulnerability scan (report-only) -----------------------
+    stage('Dependency Scan') {
+      steps {
+        dir('node-js-dummy-test') {
+          // npm audit: report high+ but do not fail the build (informational).
+          sh 'npm audit --audit-level=high || true'
+          // Trivy filesystem scan of dependencies, report-only.
+          sh '''
+            docker run --rm -v "$PWD":/src aquasec/trivy:latest fs \
+              --scanners vuln --severity HIGH,CRITICAL --no-progress /src || true
+          '''
+        }
+      }
+    }
+
+    // ---- Everything below only runs on main -------------------------------
+    stage('Build Image') {
+      when { branch 'main' }
+      steps {
+        dir('node-js-dummy-test') {
+          sh 'docker build -t $ECR_REPO:$IMAGE_TAG .'
+        }
+      }
+    }
+
+    stage('Image Vulnerability Scan') {
+      when { branch 'main' }
+      steps {
+        // Fail the build on HIGH/CRITICAL OS/library CVEs in the built image.
+        // Tune --exit-code to 0 to make this report-only if the base image has
+        // unavoidable transitive CVEs during the assessment.
+        sh '''
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image \
+            --severity HIGH,CRITICAL --exit-code 1 --no-progress \
+            $ECR_REPO:$IMAGE_TAG
+        '''
+      }
+    }
+
+    stage('Push to ECR') {
+      when { branch 'main' }
+      steps {
+        // Auth comes from the EC2 instance role; no credential binding needed.
+        sh '''
+          aws ecr get-login-password --region $AWS_REGION \
+            | docker login --username AWS --password-stdin $ECR_REGISTRY
+          docker tag  $ECR_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
+        '''
+      }
+    }
+
+    stage('Deploy Staging') {
+      when { branch 'main' }
+      steps {
+        sh './ci/scripts/ssm-deploy.sh staging $IMAGE_TAG'
+      }
+    }
+
+    stage('Approve Production') {
+      when { branch 'main' }
+      steps {
+        timeout(time: 15, unit: 'MINUTES') {
+          input message: 'Deploy this build to PRODUCTION?', ok: 'Deploy to prod'
+        }
+      }
+    }
+
+    stage('Deploy Production') {
+      when { branch 'main' }
+      steps {
+        sh './ci/scripts/ssm-deploy.sh production $IMAGE_TAG'
+      }
+    }
+  }
+
+  post {
+    failure {
+      mail to: 'vatsshikhar130@outlook.com',
+           subject: "Jenkins FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+           body: """The pipeline failed.
+
+Job:    ${env.JOB_NAME}
+Build:  #${env.BUILD_NUMBER}
+Branch: ${env.BRANCH_NAME}
+URL:    ${env.BUILD_URL}
+
+Check the console output for details."""
+    }
+    always {
+      sh 'docker image prune -f || true'
+    }
+  }
+}

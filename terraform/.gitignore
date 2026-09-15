@@ -1,0 +1,13 @@
+# Local state and backups (state lives in S3; never commit it)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Variable files may contain sensitive values
+*.tfvars
+!*.tfvars.example
+
+# Crash logs / plans
+crash.log
+*.tfplan

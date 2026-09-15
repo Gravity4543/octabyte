@@ -1,0 +1,31 @@
+# Copy to terraform.tfvars and adjust. terraform.tfvars is gitignored.
+
+aws_region   = "ap-south-1"
+project_name = "octabyte-devops"
+
+# Networking
+vpc_cidr             = "10.0.0.0/16"
+public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24"]
+azs                  = ["ap-south-1a", "ap-south-1b"]
+# RDS is the only private-subnet resource and needs no outbound internet,
+# so NAT is off to save ~$32/mo. Set true only if private resources need egress.
+enable_nat_gateway   = false
+
+# Compute
+app_instance_type        = "t3.small"
+monitoring_instance_type = "t3.micro"
+
+# App / ALB
+prod_port           = 8080
+staging_port        = 8081
+staging_host_header = "staging.localhost"
+
+# Lock this down to your own IP for security, e.g. "203.0.113.4/32"
+admin_cidr = "0.0.0.0/0"
+
+# Database
+db_instance_class     = "db.t4g.micro"
+db_name               = "appdb"
+db_username           = "appadmin"
+backup_retention_days = 7

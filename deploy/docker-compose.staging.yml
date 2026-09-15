@@ -1,0 +1,22 @@
+# Staging container. Runs on the app instance, published on port 8081.
+# IMAGE and ECR_REGISTRY are provided via environment when `docker compose` runs.
+services:
+  app-staging:
+    image: ${ECR_REGISTRY}/${IMAGE}
+    container_name: myapp-staging
+    restart: unless-stopped
+    ports:
+      - "8081:3000"
+    env_file:
+      - .env.staging
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

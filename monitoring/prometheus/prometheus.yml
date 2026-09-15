@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Host metrics (CPU, memory, disk) from the app instance
+  - job_name: node
+    static_configs:
+      - targets: ["${APP_PRIVATE_IP}:9100"]
+
+  # Container metrics from the app instance
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["${APP_PRIVATE_IP}:9323"]
+
+  # PostgreSQL metrics (runs locally on the monitoring box)
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres_exporter:9187"]
