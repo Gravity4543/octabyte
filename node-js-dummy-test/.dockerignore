@@ -1,0 +1,24 @@
+# Dependencies are reinstalled inside the image via `npm ci`.
+node_modules
+npm-debug.log*
+
+# Version control and CI metadata
+.git
+.gitignore
+
+# Local env files must never end up in the image
+.env
+.env.*
+
+# Docs and screenshots (not needed at runtime)
+readme
+*.md
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+
+# Test files are not needed in the production image
+src/**/*.test.js
