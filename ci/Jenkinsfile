@@ -63,10 +63,14 @@ pipeline {
         docker {
           image 'node:20'
           reuseNode true
+          // give the mapped jenkins user a writable HOME so npm's cache works
+          args '-e HOME=/tmp -e npm_config_cache=/tmp/.npm'
         }
       }
       steps {
         dir('node-js-dummy-test') {
+          // wipe any leftover node_modules from a previous failed run
+          sh 'rm -rf node_modules'
           sh 'npm ci'
           sh 'npm test'   // unit + integration tests (DB_MOCK=true)
         }
