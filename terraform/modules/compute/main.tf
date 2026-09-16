@@ -3,9 +3,11 @@ data "aws_ami" "al2023" {
   most_recent = true
   owners      = ["amazon"]
 
+  # standard AL2023 (has the SSM agent preinstalled). NOT the "minimal" variant,
+  # which omits the agent - the old "al2023-ami-*" pattern could match minimal.
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    values = ["al2023-ami-2023.*-x86_64"]
   }
 
   filter {

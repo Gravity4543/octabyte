@@ -7,7 +7,6 @@
 crash.log
 
 # Variable files may hold sensitive values (keep the .example)
-*.tfvars
 !*.tfvars.example
 
 # Node

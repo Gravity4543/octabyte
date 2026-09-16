@@ -63,8 +63,6 @@ pipeline {
         docker {
           image 'node:20'
           reuseNode true
-          // give the mapped jenkins user a writable HOME so npm's cache works
-          args '-e HOME=/tmp -e npm_config_cache=/tmp/.npm'
         }
       }
       steps {

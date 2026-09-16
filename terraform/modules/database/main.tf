@@ -55,6 +55,8 @@ resource "aws_db_instance" "this" {
 resource "aws_secretsmanager_secret" "db" {
   name        = "${var.project_name}/db/credentials"
   description = "PostgreSQL master credentials and connection details"
+ 
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "db" {

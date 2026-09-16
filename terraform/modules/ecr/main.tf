@@ -1,6 +1,7 @@
 resource "aws_ecr_repository" "app" {
   name                 = "${var.project_name}/app"
   image_tag_mutability = "MUTABLE"
+  force_delete = true
 
   # extra scan signal in the console (Trivy also runs in CI)
   image_scanning_configuration {

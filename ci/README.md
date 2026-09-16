@@ -52,14 +52,6 @@ on failure (any stage): email notification
 No Jenkins credentials are required: AWS access is via the instance role, and
 failure notifications use SMTP configured at the system level (no secret needed).
 
-### Global environment (Manage Jenkins -> System)
-| Variable          | Value                              |
-|-------------------|------------------------------------|
-| `APP_INSTANCE_ID` | `terraform output app_instance_id` |
-
-`AWS_ACCOUNT_ID` and `ECR_REGISTRY` are resolved at runtime from the instance role
-(via `aws sts get-caller-identity`). `ECR_REPO`, `IMAGE_TAG`, `AWS_REGION`, and
-`DB_SECRET_NAME` are set in the `environment {}` block of the Jenkinsfile.
 
 ### Job setup
 - Create a **Multibranch Pipeline** (or Pipeline) job pointed at the repo.
@@ -72,6 +64,7 @@ Attach this to the Jenkins EC2 instance role (plus `AmazonSSMManagedInstanceCore
 if you want to reach the box via SSM Session Manager). `sts:GetCallerIdentity` is
 allowed by default, so no extra permission is needed for the account lookup.
 
+I have attached the roles from aws panal Here is the policy json used for the IAM role
 ```json
 {
   "Version": "2012-10-17",

@@ -5,7 +5,7 @@
 .terraform.lock.hcl
 
 # Variable files may contain sensitive values
-*.tfvars
+
 !*.tfvars.example
 
 # Crash logs / plans
